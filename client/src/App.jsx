@@ -1,0 +1,110 @@
+import { useEffect, useState } from "react";
+import ProductCard from "./components/ProductCart";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import ContactForm from "./components/ContactForm";
+import { apiFetch } from "./api";
+
+function App() {
+  const [products, setProducts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [cartCount, setCartCount] = useState(0);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
+  function handleLogin(user, token) {
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+    setUser(user);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setUser(null);
+  }
+
+  useEffect(() => {
+    if (!localStorage.getItem("token")) return;
+    (async () => {
+      const res = await apiFetch(`/api/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const userData = await res.json();
+      localStorage.setItem("user", JSON.stringify(userData));
+      setUser(userData);
+    })();
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch("/api/products")
+      .then((res) => res.json())
+      .then((data) => setProducts(data))
+      .catch((err) => setError(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <>
+      <Header
+        cartCount={cartCount}
+        user={user}
+        onLogin={handleLogin}
+        handleLogout={handleLogout}
+      />
+      <main className="page">
+        <section id="catalog" className="catalog">
+          <div className="catalog-toolbar">
+            <h2>Каталог</h2>
+            <input
+              type="search"
+              placeholder="Поиск товара по каталогу..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="product-grid">
+            {products
+              ?.filter((el) =>
+                el.name
+                  .toLowerCase()
+                  .trim()
+                  .includes(searchTerm.toLowerCase().trim()),
+              )
+              .map((product) => (
+                <ProductCard
+                  addOn={setCartCount}
+                  key={product.id}
+                  featured={product.id === 1}
+                  product={product}
+                />
+              ))}
+          </div>
+          {loading && <p className="status-message">Загрузка товаров...</p>}
+          {error && <p className="status-message">Ошибка загрузки товаров: {String(error)}</p>}
+        </section>
+        <aside id="delivery" className="sidebar">
+          <h3>Доставка</h3>
+          <ul>
+            <li>Астана — на следующий день</li>
+            <li>Не Астана - Долговато</li>
+            <li>Бесплатно от много тг</li>
+          </ul>
+        </aside>
+        <ContactForm />
+      </main>
+
+      <Footer />
+    </>
+  );
+}
+
+export default App;
